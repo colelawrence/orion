@@ -43,7 +43,7 @@ pub struct StreamingContextConsistencyTester<R: PartialEq, T: DefaultTestableStr
 
 impl<R, T> StreamingContextConsistencyTester<R, T>
 where
-	R: PartialEq,
+	R: PartialEq + core::fmt::Debug,
 	T: DefaultTestableStreamingContext<R>,
 {
 	pub fn new(streaming_context: T, return_type: R, blocksize: usize) -> Self {
@@ -68,7 +68,6 @@ where
 		self.double_reset_ok(data);
 	}
 
-	#[cfg(not(feature = "safe_api"))]
 	/// Used when quickcheck is not available to generate input.
 	/// Default input `data` is used instead.
 	pub fn run_all_tests(&self) {
@@ -200,10 +199,11 @@ where
 				other_data.extend_from_slice(&[0u8; 256]);
 				state.update(&[0u8; 256]).unwrap();
 			}
+            
+            let streaming_result = state.finalize().unwrap();
+			let one_shot_result = T::one_shot(&other_data).unwrap();
 
-			let one_shot_result = T::one_shot(&data).unwrap();
-
-			assert!(state.finalize().unwrap() == one_shot_result);
+			assert!(streaming_result == one_shot_result);
 		}
 	}
 
