@@ -511,43 +511,10 @@ pub fn hchacha20(
 #[cfg(test)]
 mod public {
 	use super::*;
-	// One function tested per submodule.
 
-	// encrypt()/decrypt() are tested together here
-	// since decrypt() is just a wrapper around encrypt()
-	// and so only the decrypt() function is called
 	mod test_encrypt_decrypt {
 		use super::*;
 		use crate::test_framework::streamcipher_interface::*;
-
-		#[test]
-		fn test_fail_on_initial_counter_overflow() {
-			let mut dst = [0u8; 65];
-
-			assert!(decrypt(
-				&SecretKey::from_slice(&[0u8; 32]).unwrap(),
-				&Nonce::from_slice(&[0u8; 12]).unwrap(),
-				u32::max_value(),
-				&[0u8; 65],
-				&mut dst,
-			)
-			.is_err());
-		}
-
-		#[test]
-		fn test_pass_on_one_iter_max_initial_counter() {
-			let mut dst = [0u8; 64];
-			// Should pass because only one iteration is completed, so block_counter will
-			// not increase
-			assert!(decrypt(
-				&SecretKey::from_slice(&[0u8; 32]).unwrap(),
-				&Nonce::from_slice(&[0u8; 12]).unwrap(),
-				u32::max_value(),
-				&[0u8; 64],
-				&mut dst,
-			)
-			.is_ok());
-		}
 
 		#[cfg(feature = "safe_api")]
 		#[test]

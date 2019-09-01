@@ -45,6 +45,8 @@ pub fn StreamCipherTestRunner<Encryptor, Decryptor, Key, Nonce>(
 	}
 
 	encrypt_decrypt_input_empty(&encryptor, &decryptor, &key, &nonce);
+	initial_counter_overflow_err(&encryptor, &decryptor, &key, &nonce);
+	initial_counter_max_ok(&encryptor, &decryptor, &key, &nonce);
 }
 
 /// Given a input length `a` find out how many times
@@ -169,4 +171,62 @@ fn encrypt_decrypt_same_plaintext<Encryptor, Decryptor, Key, Nonce>(
 	decryptor(key, nonce, counter, &dst_out_ct, &mut dst_out_pt).unwrap();
 
 	assert_eq!(input, &dst_out_pt[..]);
+}
+
+/// Test that a initial counter will not overflow the internal.
+fn initial_counter_overflow_err<Encryptor, Decryptor, Key, Nonce>(
+	encryptor: &Encryptor,
+	decryptor: &Decryptor,
+	key: &Key,
+	nonce: &Nonce,
+) where
+	Encryptor: Fn(&Key, &Nonce, u32, &[u8], &mut [u8]) -> Result<(), UnknownCryptoError>,
+	Decryptor: Fn(&Key, &Nonce, u32, &[u8], &mut [u8]) -> Result<(), UnknownCryptoError>,
+{
+	let mut dst_out = [0u8; 128];
+	assert!(encryptor(
+		key,
+		nonce,
+		u32::max_value(),
+		&[0u8; 65], //  CHACHA_BLOCKSIZE + 1 one to trigger internal block counter addition.
+		&mut dst_out,
+	)
+	.is_err());
+	assert!(decryptor(
+		key,
+		nonce,
+		u32::max_value(),
+		&[0u8; 65], //  CHACHA_BLOCKSIZE + 1 one to trigger internal block counter addition.
+		&mut dst_out,
+	)
+	.is_err());
+}
+
+/// Test that processing one block does not fail on the largest possible initial block counter.
+fn initial_counter_max_ok<Encryptor, Decryptor, Key, Nonce>(
+	encryptor: &Encryptor,
+	decryptor: &Decryptor,
+	key: &Key,
+	nonce: &Nonce,
+) where
+	Encryptor: Fn(&Key, &Nonce, u32, &[u8], &mut [u8]) -> Result<(), UnknownCryptoError>,
+	Decryptor: Fn(&Key, &Nonce, u32, &[u8], &mut [u8]) -> Result<(), UnknownCryptoError>,
+{
+	let mut dst_out = [0u8; 64];
+	assert!(encryptor(
+		key,
+		nonce,
+		u32::max_value(),
+		&[0u8; 64], // Only needs to process one keystream
+		&mut dst_out,
+	)
+	.is_ok());
+	assert!(decryptor(
+		key,
+		nonce,
+		u32::max_value(),
+		&[0u8; 64], // Only needs to process one keystream
+		&mut dst_out,
+	)
+	.is_ok());
 }
