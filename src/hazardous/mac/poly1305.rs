@@ -526,15 +526,13 @@ mod public {
 
 	mod test_streaming_interface {
 		use super::*;
-		use crate::test_framework::stream_interface::*;
+		use crate::test_framework::streaming_interface::{
+			StreamingContextConsistencyTester, TestableStreamingContext,
+		};
 
 		const KEY: [u8; 32] = [0u8; 32];
 
-		impl DefaultTestableStreamingContext<Tag> for Poly1305 {
-			fn init() -> Self {
-				Self::init(&OneTimeKey::from_slice(&KEY).unwrap())
-			}
-
+		impl TestableStreamingContext<Tag> for Poly1305 {
 			fn reset(&mut self) -> Result<(), UnknownCryptoError> {
 				Ok(self.reset())
 			}
@@ -563,11 +561,11 @@ mod public {
 
 		#[test]
 		fn default_consistency_tests() {
-			let dummy_state: Poly1305 = Poly1305::init(&OneTimeKey::from_slice(&KEY).unwrap());
+			let initial_state: Poly1305 = Poly1305::init(&OneTimeKey::from_slice(&KEY).unwrap());
 			let dummy_tag: Tag = Tag::from_slice(&[0u8; POLY1305_OUTSIZE]).unwrap();
 
 			let test_runner = StreamingContextConsistencyTester::<Tag, Poly1305>::new(
-				dummy_state,
+				initial_state,
 				dummy_tag,
 				POLY1305_BLOCKSIZE,
 			);
@@ -583,26 +581,12 @@ mod public {
 				/// Related bug: https://github.com/brycx/orion/issues/46
 				/// Test different streaming state usage patterns.
 				fn prop_input_to_consistency(data: Vec<u8>) -> bool {
-					let dummy_state: Poly1305 = Poly1305::init(&OneTimeKey::from_slice(&KEY).unwrap());
+					let initial_state: Poly1305 = Poly1305::init(&OneTimeKey::from_slice(&KEY).unwrap());
 					let dummy_tag: Tag = Tag::from_slice(&[0u8; POLY1305_OUTSIZE]).unwrap();
 
-					let test_runner = StreamingContextConsistencyTester::<Tag, Poly1305>::new(dummy_state, dummy_tag, POLY1305_BLOCKSIZE);
-					test_runner.run_all_tests_with_input(&data);
+					let test_runner = StreamingContextConsistencyTester::<Tag, Poly1305>::new(initial_state, dummy_tag, POLY1305_BLOCKSIZE);
+					test_runner.run_all_tests_property(&data);
 					true
-				}
-			}
-
-			quickcheck! {
-				/// Using the one-shot function should always produce the
-				/// same result as when using the streaming interface.
-				fn prop_poly1305_same_as_streaming(data: Vec<u8>) -> bool {
-					let sk = OneTimeKey::generate();
-					let mut state = Poly1305::init(&sk);
-					state.update(&data[..]).unwrap();
-					let stream = state.finalize().unwrap();
-					let one_shot = poly1305(&sk, &data[..]).unwrap();
-
-					(one_shot == stream)
 				}
 			}
 		}

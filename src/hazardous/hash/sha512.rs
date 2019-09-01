@@ -427,13 +427,9 @@ mod public {
 
 	mod test_streaming_interface {
 		use super::*;
-		use crate::test_framework::stream_interface::*;
+		use crate::test_framework::streaming_interface::*;
 
-		impl DefaultTestableStreamingContext<Digest> for Sha512 {
-			fn init() -> Self {
-				Self::init()
-			}
-
+		impl TestableStreamingContext<Digest> for Sha512 {
 			fn reset(&mut self) -> Result<(), UnknownCryptoError> {
 				Ok(self.reset())
 			}
@@ -457,11 +453,11 @@ mod public {
 
 		#[test]
 		fn default_consistency_tests() {
-			let dummy_state: Sha512 = Sha512::init();
+			let initial_state: Sha512 = Sha512::init();
 			let dummy_tag: Digest = Digest::from_slice(&[0u8; SHA512_OUTSIZE]).unwrap();
 
 			let test_runner = StreamingContextConsistencyTester::<Digest, Sha512>::new(
-				dummy_state,
+				initial_state,
 				dummy_tag,
 				SHA512_BLOCKSIZE,
 			);
@@ -477,29 +473,16 @@ mod public {
 				/// Related bug: https://github.com/brycx/orion/issues/46
 				/// Test different streaming state usage patterns.
 				fn prop_input_to_consistency(data: Vec<u8>) -> bool {
-					let dummy_state: Sha512 = Sha512::init();
+					let initial_state: Sha512 = Sha512::init();
 					let dummy_tag: Digest = Digest::from_slice(&[0u8; SHA512_OUTSIZE]).unwrap();
 
 					let test_runner = StreamingContextConsistencyTester::<Digest, Sha512>::new(
-						dummy_state,
+						initial_state,
 						dummy_tag,
 						SHA512_BLOCKSIZE,
 					);
-					test_runner.run_all_tests_with_input(&data);
+					test_runner.run_all_tests_property(&data);
 					true
-				}
-			}
-
-			quickcheck! {
-				/// Using the one-shot function should always produce the
-				/// same result as when using the streaming interface.
-				fn prop_digest_same_as_streaming(data: Vec<u8>) -> bool {
-					let mut state = Sha512::init();
-					state.update(&data[..]).unwrap();
-					let stream = state.finalize().unwrap();
-					let one_shot = digest(&data[..]).unwrap();
-
-					(one_shot == stream)
 				}
 			}
 		}

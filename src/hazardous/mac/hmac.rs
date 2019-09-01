@@ -281,15 +281,11 @@ mod public {
 	mod test_streaming_interface {
 		use super::*;
 		use crate::hazardous::hash::sha512::compare_sha512_states;
-		use crate::test_framework::stream_interface::*;
+		use crate::test_framework::streaming_interface::*;
 
 		const KEY: [u8; 32] = [0u8; 32];
 
-		impl DefaultTestableStreamingContext<Tag> for Hmac {
-			fn init() -> Self {
-				Self::init(&SecretKey::from_slice(&KEY).unwrap())
-			}
-
+		impl TestableStreamingContext<Tag> for Hmac {
 			fn reset(&mut self) -> Result<(), UnknownCryptoError> {
 				Ok(self.reset())
 			}
@@ -316,11 +312,11 @@ mod public {
 
 		#[test]
 		fn default_consistency_tests() {
-			let dummy_state: Hmac = Hmac::init(&SecretKey::from_slice(&KEY).unwrap());
+			let initial_state: Hmac = Hmac::init(&SecretKey::from_slice(&KEY).unwrap());
 			let dummy_tag: Tag = Tag::from_slice(&[0u8; SHA512_OUTSIZE]).unwrap();
 
 			let test_runner = StreamingContextConsistencyTester::<Tag, Hmac>::new(
-				dummy_state,
+				initial_state,
 				dummy_tag,
 				SHA512_BLOCKSIZE,
 			);
@@ -336,30 +332,16 @@ mod public {
 				/// Related bug: https://github.com/brycx/orion/issues/46
 				/// Test different streaming state usage patterns.
 				fn prop_input_to_consistency(data: Vec<u8>) -> bool {
-					let dummy_state: Hmac = Hmac::init(&SecretKey::from_slice(&KEY).unwrap());
+					let initial_state: Hmac = Hmac::init(&SecretKey::from_slice(&KEY).unwrap());
 					let dummy_tag: Tag = Tag::from_slice(&[0u8; SHA512_OUTSIZE]).unwrap();
 
 					let test_runner = StreamingContextConsistencyTester::<Tag, Hmac>::new(
-						dummy_state,
+						initial_state,
 						dummy_tag,
 						SHA512_BLOCKSIZE,
 					);
-					test_runner.run_all_tests_with_input(&data);
+					test_runner.run_all_tests_property(&data);
 					true
-				}
-			}
-
-			quickcheck! {
-				/// Using the one-shot function should always produce the
-				/// same result as when using the streaming interface.
-				fn prop_hmac_same_as_streaming(data: Vec<u8>) -> bool {
-					let sk = SecretKey::generate();
-					let mut state = Hmac::init(&sk);
-					state.update(&data[..]).unwrap();
-					let stream = state.finalize().unwrap();
-					let one_shot = hmac(&sk, &data[..]).unwrap();
-
-					(one_shot == stream)
 				}
 			}
 		}
