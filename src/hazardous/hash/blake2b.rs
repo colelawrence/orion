@@ -502,7 +502,7 @@ mod public {
 
 	mod test_streaming_interface_no_key {
 		use super::*;
-		use crate::test_framework::streaming_interface::*;
+		use crate::test_framework::incremental_interface::*;
 
 		impl TestableStreamingContext<Digest> for Blake2b {
 			fn reset(&mut self) -> Result<(), UnknownCryptoError> {

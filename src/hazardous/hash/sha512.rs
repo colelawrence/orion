@@ -427,7 +427,7 @@ mod public {
 
 	mod test_streaming_interface {
 		use super::*;
-		use crate::test_framework::streaming_interface::*;
+		use crate::test_framework::incremental_interface::*;
 
 		impl TestableStreamingContext<Digest> for Sha512 {
 			fn reset(&mut self) -> Result<(), UnknownCryptoError> {

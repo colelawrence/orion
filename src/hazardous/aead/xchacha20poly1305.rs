@@ -174,13 +174,13 @@ mod public {
 	#[cfg(feature = "safe_api")]
 	mod proptest {
 		use super::*;
-		use crate::test_framework::aead_interface::*;
 		use crate::hazardous::mac::poly1305::POLY1305_OUTSIZE;
+		use crate::test_framework::aead_interface::*;
 
 		quickcheck! {
 			fn prop_aead_interface(input: Vec<u8>, ad: Vec<u8>) -> bool {
 				let secret_key = SecretKey::generate();
-				let nonce = Nonce::generate();				
+				let nonce = Nonce::generate();
 				AeadTestRunner(seal, open, secret_key, nonce, &input, POLY1305_OUTSIZE, &ad);
 
 				true

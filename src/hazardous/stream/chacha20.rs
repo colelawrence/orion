@@ -518,6 +518,8 @@ mod public {
 	// and so only the decrypt() function is called
 	mod test_encrypt_decrypt {
 		use super::*;
+		use crate::test_framework::streamcipher_interface::*;
+
 		#[test]
 		fn test_fail_on_initial_counter_overflow() {
 			let mut dst = [0u8; 65];
@@ -547,54 +549,14 @@ mod public {
 			.is_ok());
 		}
 
+		#[cfg(feature = "safe_api")]
 		#[test]
-		fn test_fail_on_empty_plaintext() {
-			let mut dst = [0u8; 64];
+		fn test_streamcipher_interface() {
+			let default_input = &[0u8; 64];
 
-			assert!(decrypt(
-				&SecretKey::from_slice(&[0u8; 32]).unwrap(),
-				&Nonce::from_slice(&[0u8; 12]).unwrap(),
-				0,
-				&[0u8; 0],
-				&mut dst,
-			)
-			.is_err());
-		}
-
-		#[test]
-		fn test_dst_out_length() {
-			let mut dst_small = [0u8; 64];
-
-			assert!(decrypt(
-				&SecretKey::from_slice(&[0u8; 32]).unwrap(),
-				&Nonce::from_slice(&[0u8; 12]).unwrap(),
-				0,
-				&[0u8; 128],
-				&mut dst_small,
-			)
-			.is_err());
-
-			let mut dst = [0u8; 64];
-
-			assert!(decrypt(
-				&SecretKey::from_slice(&[0u8; 32]).unwrap(),
-				&Nonce::from_slice(&[0u8; 12]).unwrap(),
-				0,
-				&[0u8; 64],
-				&mut dst,
-			)
-			.is_ok());
-
-			let mut dst_big = [0u8; 64];
-
-			assert!(decrypt(
-				&SecretKey::from_slice(&[0u8; 32]).unwrap(),
-				&Nonce::from_slice(&[0u8; 12]).unwrap(),
-				0,
-				&[0u8; 32],
-				&mut dst_big,
-			)
-			.is_ok());
+			let secret_key = SecretKey::generate();
+			let nonce = Nonce::from_slice(&[0u8; IETF_CHACHA_NONCESIZE]).unwrap();
+			StreamCipherTestRunner(encrypt, decrypt, secret_key, nonce, 0, default_input);
 		}
 
 		// Proptests. Only exectued when NOT testing no_std.
@@ -602,72 +564,13 @@ mod public {
 		mod proptest {
 			use super::*;
 
-			/// Given a input length `a` find out how many times
-			/// the initial counter on encrypt()/decrypt() would
-			/// increase.
-			fn counter_increase_times(a: f32) -> u32 {
-				// Otherwise a overvlowing subtration would happen
-				if a <= 64f32 {
-					return 0;
-				}
-
-				let check_with_floor = (a / 64f32).floor();
-				let actual = a / 64f32;
-
-				assert!(actual >= check_with_floor);
-				// Subtract one because the first 64 in length
-				// the counter does not increase
-				if actual > check_with_floor {
-					(actual.ceil() as u32) - 1
-				} else {
-					(actual as u32) - 1
-				}
-			}
-
 			quickcheck! {
-				// Encrypting input, and then decrypting should always yield the same input.
-				fn prop_encrypt_decrypt_same_input(input: Vec<u8>, block_counter: u32) -> bool {
-					let pt = if input.is_empty() {
-						vec![1u8; 10]
-					} else {
-						input
-					};
+				fn prop_streamcipher_interface(input: Vec<u8>, counter: u32) -> bool {
+					let secret_key = SecretKey::generate();
+					let nonce = Nonce::from_slice(&[0u8; IETF_CHACHA_NONCESIZE]).unwrap();
+					StreamCipherTestRunner(encrypt, decrypt, secret_key, nonce, counter, &input);
 
-					let mut dst_out_ct = vec![0u8; pt.len()];
-					let mut dst_out_pt = vec![0u8; pt.len()];
-
-					// If `block_counter` is high enough check if it would overflow
-					if counter_increase_times(pt.len() as f32).checked_add(block_counter).is_none() {
-						// Overflow will occur and the operation should fail
-						let res = if encrypt(
-							&SecretKey::from_slice(&[0u8; 32]).unwrap(),
-							&Nonce::from_slice(&[0u8; 12]).unwrap(),
-							block_counter,
-							&pt[..],
-							&mut dst_out_ct,
-						).is_err() { true } else { false };
-
-						return res;
-					} else {
-
-						encrypt(
-							&SecretKey::from_slice(&[0u8; 32]).unwrap(),
-							&Nonce::from_slice(&[0u8; 12]).unwrap(),
-							block_counter,
-							&pt[..],
-							&mut dst_out_ct,
-						).unwrap();
-
-						decrypt(
-							&SecretKey::from_slice(&[0u8; 32]).unwrap(),
-							&Nonce::from_slice(&[0u8; 12]).unwrap(),
-							block_counter,
-							&dst_out_ct[..],
-							&mut dst_out_pt,
-						).unwrap();
-
-						return dst_out_pt == pt;
-					}
+					true
 				}
 			}
 
